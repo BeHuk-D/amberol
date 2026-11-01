@@ -70,11 +70,11 @@ queuerow box.song-details {
 
 queuerow label.song-title {
   font-weight: 700;
-  font-size: 85%;
+  font-size: 83%;
 }
 
 queuerow label.song-artist {
-  font-size: 85%;
+  font-size: 83%;
 }
 
 queuerow picture.cover,
