@@ -29,6 +29,27 @@ by using this command:
 
 <a href="https://flathub.org/apps/details/io.bassi.Amberol"><img src="https://flathub.org/api/badge?svg&locale=en" width="200"/></a>
 
+Downloading songs from links
+----------------------------
+
+Amberol can download songs by pasting a link to a song or video: the audio track
+is saved to `~/Music/Amberol` and added to the queue. Links from YouTube and any
+other site supported by [yt-dlp](https://github.com/yt-dlp/yt-dlp) can be used.
+
+This feature requires `yt-dlp` to be available in your `PATH` when running
+Amberol from source. Flatpak builds of this fork bundle it automatically.
+
+Install `yt-dlp` with your distribution's package manager, or download the
+standalone binary:
+
+    mkdir -p ~/.local/bin
+    curl -L -o ~/.local/bin/yt-dlp https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp_linux
+    chmod +x ~/.local/bin/yt-dlp
+
+Make sure `~/.local/bin` is in your `PATH`. yt-dlp has to be updated regularly
+to keep working with YouTube: run `yt-dlp -U` for the standalone binary, or
+update it through your package manager.
+
 Getting in touch
 ----------------
 
