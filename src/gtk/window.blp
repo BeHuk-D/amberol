@@ -71,6 +71,15 @@ template $AmberolWindow: Adw.ApplicationWindow {
                         "pill",
                       ]
                     }
+
+                    Button {
+                      label: _("Add Link");
+                      action-name: "queue.add-link";
+
+                      styles [
+                        "pill",
+                      ]
+                    }
                   };
                 };
               };
@@ -89,6 +98,9 @@ template $AmberolWindow: Adw.ApplicationWindow {
                 Adw.HeaderBar {
                   show-title: false;
                 }
+
+                [top]
+                $AmberolDownloadBar download_bar {}
 
                 content: Box main_box {
                   orientation: vertical;

@@ -6,6 +6,8 @@ All notable changes to this project will be documented in this file.
 
 ### Added
 
+- Add songs by pasting a link, using yt-dlp
+
 ### Changed
 
 ### Fixed

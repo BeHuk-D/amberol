@@ -15,6 +15,7 @@ use log::{debug, warn};
 use crate::{
     audio::AudioPlayer,
     config::{APPLICATION_ID, VERSION},
+    download::DownloadManager,
     i18n::i18n,
     utils,
     window::Window,
@@ -30,6 +31,7 @@ mod imp {
     #[derive(Debug)]
     pub struct Application {
         pub player: Rc<AudioPlayer>,
+        pub download_manager: DownloadManager,
         pub receiver: RefCell<Option<Receiver<ApplicationAction>>>,
         pub background_hold: RefCell<Option<gio::ApplicationHoldGuard>>,
         pub settings: gio::Settings,
@@ -47,6 +49,7 @@ mod imp {
 
             Self {
                 player: AudioPlayer::new(sender),
+                download_manager: DownloadManager::new(),
                 receiver,
                 background_hold: RefCell::default(),
                 settings: utils::settings_manager(),
@@ -132,6 +135,10 @@ impl Application {
 
     pub fn player(&self) -> Rc<AudioPlayer> {
         self.imp().player.clone()
+    }
+
+    pub fn download_manager(&self) -> DownloadManager {
+        self.imp().download_manager.clone()
     }
 
     fn setup_settings(&self) {

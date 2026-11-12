@@ -1,0 +1,66 @@
+// SPDX-FileCopyrightText: 2026  Dmitriy
+// SPDX-License-Identifier: GPL-3.0-or-later
+
+using Gtk 4.0;
+
+template $AmberolDownloadBar: Widget {
+  Revealer revealer {
+    transition-type: slide_down;
+    transition-duration: 200;
+
+    child: Box {
+      orientation: vertical;
+      spacing: 4;
+
+      Box {
+        margin-start: 12;
+        margin-end: 12;
+        margin-top: 6;
+        spacing: 8;
+
+        Image download_icon {
+          icon-name: "folder-download-symbolic";
+          valign: center;
+        }
+
+        Label title_label {
+          hexpand: true;
+          xalign: 0;
+          ellipsize: end;
+          valign: center;
+        }
+
+        Label stats_label {
+          valign: center;
+
+          styles [
+            "caption",
+            "numeric",
+            "dim-label",
+          ]
+        }
+
+        Button cancel_button {
+          icon-name: "window-close-symbolic";
+          valign: center;
+          tooltip-text: _("Cancel Download");
+
+          styles [
+            "flat",
+            "circular",
+          ]
+
+          accessibility {
+            label: _("Cancel Download");
+          }
+        }
+      }
+
+      ProgressBar progress_bar {
+        margin-start: 12;
+        margin-end: 12;
+        margin-bottom: 6;
+      }
+    };
+  }
+}

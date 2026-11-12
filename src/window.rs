@@ -9,6 +9,7 @@ use std::{
     time::Instant,
 };
 
+use adw::prelude::{AlertDialogExt, AlertDialogExtManual, PreferencesRowExt};
 use adw::subclass::prelude::*;
 use glib::{clone, closure_local};
 use gtk::{gdk, gio, glib, prelude::*, CompositeTemplate};
@@ -17,6 +18,8 @@ use log::debug;
 use crate::{
     audio::{AudioPlayer, RepeatMode, ReplayGainMode, Song},
     config::APPLICATION_ID,
+    download::DownloadManager,
+    download_bar::DownloadBar,
     drag_overlay::DragOverlay,
     i18n::{i18n, i18n_k, ni18n_f, ni18n_k},
     playback_control::PlaybackControl,
@@ -76,6 +79,8 @@ mod imp {
         pub add_folder_button: TemplateChild<gtk::Button>,
         #[template_child]
         pub restore_playlist_button: TemplateChild<gtk::Button>,
+        #[template_child]
+        pub download_bar: TemplateChild<DownloadBar>,
 
         pub provider: gtk::CssProvider,
         pub settings: gio::Settings,
@@ -95,6 +100,9 @@ mod imp {
         pub notify_nsongs_id: RefCell<Option<glib::SignalHandlerId>>,
         pub notify_current_id: RefCell<Option<glib::SignalHandlerId>>,
         pub notify_peaks_id: RefCell<Option<glib::SignalHandlerId>>,
+        pub download_state_id: RefCell<Option<glib::SignalHandlerId>>,
+        pub download_finished_id: RefCell<Option<glib::SignalHandlerId>>,
+        pub download_failed_id: RefCell<Option<glib::SignalHandlerId>>,
     }
 
     #[glib::object_subclass]
@@ -193,6 +201,10 @@ mod imp {
                     }
                 }
             });
+            klass.install_action_async("queue.add-link", None, |win, _, _| async move {
+                debug!("Window::queue.add-link()");
+                win.add_link().await;
+            });
             klass.install_action("queue.restore-playlist", None, move |win, _, _| {
                 debug!("Window::queue.restore-playlist()");
                 win.restore_playlist();
@@ -249,6 +261,7 @@ mod imp {
                 add_folder_button: TemplateChild::default(),
                 restore_playlist_button: TemplateChild::default(),
                 playlist_view: TemplateChild::default(),
+                download_bar: TemplateChild::default(),
                 playlist_shuffled: Cell::new(false),
                 playlist_visible: Cell::new(true),
                 playlist_selection: Cell::new(false),
@@ -264,6 +277,9 @@ mod imp {
                 notify_nsongs_id: RefCell::new(None),
                 notify_current_id: RefCell::new(None),
                 notify_peaks_id: RefCell::new(None),
+                download_state_id: RefCell::new(None),
+                download_finished_id: RefCell::new(None),
+                download_failed_id: RefCell::new(None),
             }
         }
     }
@@ -341,6 +357,7 @@ impl Window {
         win.setup_provider();
         win.bind_state();
         win.bind_queue();
+        win.bind_downloads();
         win.connect_signals();
         win.restore_window_state();
         win.set_initial_state();
@@ -661,6 +678,151 @@ impl Window {
         }
 
         self.queue_songs(queue);
+    }
+
+    fn bind_downloads(&self) {
+        let Some(manager) = self.download_manager() else {
+            return;
+        };
+
+        let state_id = manager.connect_closure(
+            "state-changed",
+            false,
+            closure_local!(
+                #[weak(rename_to = win)]
+                self,
+                move |manager: DownloadManager| {
+                    win.imp().download_bar.update(&manager);
+                    match manager.status().as_str() {
+                        "resolving" | "downloading" | "processing" | "error" => {
+                            win.switch_mode(WindowMode::MainView);
+                        }
+                        "idle" | "cancelled" => {
+                            let empty = win
+                                .player()
+                                .map(|player| player.queue().is_empty())
+                                .unwrap_or(true);
+                            if empty {
+                                win.switch_mode(WindowMode::InitialView);
+                            }
+                        }
+                        _ => {}
+                    }
+                }
+            ),
+        );
+        let finished_id = manager.connect_closure(
+            "finished",
+            false,
+            closure_local!(
+                #[weak(rename_to = win)]
+                self,
+                move |_manager: DownloadManager, path: String| {
+                    win.open_files(&[gio::File::for_path(path)]);
+                }
+            ),
+        );
+        let failed_id = manager.connect_closure(
+            "failed",
+            false,
+            closure_local!(
+                #[weak(rename_to = win)]
+                self,
+                move |_manager: DownloadManager, message: String| {
+                    win.add_toast(message);
+                }
+            ),
+        );
+
+        self.imp().download_bar.connect_closure(
+            "cancel-requested",
+            false,
+            closure_local!(
+                #[weak(rename_to = win)]
+                self,
+                move |_bar: DownloadBar| {
+                    let Some(manager) = win.download_manager() else {
+                        return;
+                    };
+
+                    if manager.busy() {
+                        manager.cancel_active();
+                    } else {
+                        manager.dismiss();
+                    }
+                }
+            ),
+        );
+
+        self.imp().download_state_id.replace(Some(state_id));
+        self.imp().download_finished_id.replace(Some(finished_id));
+        self.imp().download_failed_id.replace(Some(failed_id));
+
+        self.imp().download_bar.update(&manager);
+    }
+
+    fn unbind_downloads(&self) {
+        let Some(manager) = self.download_manager() else {
+            return;
+        };
+
+        if let Some(id) = self.imp().download_state_id.take() {
+            manager.disconnect(id);
+        }
+        if let Some(id) = self.imp().download_finished_id.take() {
+            manager.disconnect(id);
+        }
+        if let Some(id) = self.imp().download_failed_id.take() {
+            manager.disconnect(id);
+        }
+    }
+
+    fn download_manager(&self) -> Option<DownloadManager> {
+        self.application()
+            .and_then(|app| app.downcast::<crate::application::Application>().ok())
+            .map(|app| app.download_manager())
+    }
+
+    async fn add_link(&self) {
+        let Some(manager) = self.download_manager() else {
+            return;
+        };
+
+        if !manager.is_available() {
+            self.add_toast(i18n("yt-dlp is not installed"));
+            return;
+        }
+
+        let entry = adw::EntryRow::new();
+        entry.set_title(&i18n("Link"));
+
+        let list = gtk::ListBox::new();
+        list.add_css_class("boxed-list");
+        list.append(&entry);
+
+        let dialog = adw::AlertDialog::new(
+            Some(&i18n("Add from Link")),
+            Some(&i18n(
+                "Paste a link to a song or video. Amberol will download the audio track.",
+            )),
+        );
+        dialog.set_extra_child(Some(&list));
+        dialog.add_response("cancel", &i18n("_Cancel"));
+        dialog.add_response("download", &i18n("_Download"));
+        dialog.set_response_appearance("download", adw::ResponseAppearance::Suggested);
+        dialog.set_default_response(Some("download"));
+
+        if let Ok(Some(text)) = self.clipboard().read_text_future().await {
+            if crate::download::normalize_url(&text).is_some() {
+                entry.set_text(&text);
+            }
+        }
+
+        if dialog.choose_future(Some(self)).await == "download" {
+            if let Err(message) = manager.enqueue(entry.text().as_str()) {
+                self.add_toast(message);
+            }
+        }
     }
 
     // Bind the PlayerState to the UI
@@ -1024,6 +1186,7 @@ impl Window {
             window.unbind_queue();
             window.unbind_state();
             window.unbind_waveform();
+            window.unbind_downloads();
 
             glib::Propagation::Proceed
         });

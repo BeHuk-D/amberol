@@ -143,6 +143,25 @@ volume > scale trough highlight { min-height: 12px; min-width: 12px; }
 
 volume > scale trough slider { opacity: 0; }
 
+downloadbar {
+  background: color-mix(in srgb, var(--window-bg-color) 92%, transparent);
+  border-bottom: 1px solid var(--border-color);
+}
+
+downloadbar.error {
+  background: color-mix(in srgb, var(--destructive-color) 18%, var(--window-bg-color));
+}
+
+downloadbar.error label {
+  color: var(--destructive-color);
+}
+
+downloadbar progressbar trough,
+downloadbar progressbar progress {
+  min-height: 3px;
+  min-width: 3px;
+}
+
 @media (prefers-color-scheme: dark) {
   .main-window {
     --sidebar-bg-color: rgb(255 255 255 / 5.5%);

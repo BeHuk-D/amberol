@@ -3,6 +3,7 @@
 
 blueprints = custom_target('blueprints',
   input: files(
+    'download-bar.blp',
     'playback-control.blp',
     'playlist-view.blp',
     'queue-row.blp',

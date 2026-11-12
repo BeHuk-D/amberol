@@ -5,6 +5,8 @@ mod application;
 mod audio;
 mod config;
 mod cover_picture;
+mod download;
+mod download_bar;
 mod drag_overlay;
 mod i18n;
 mod marquee;
